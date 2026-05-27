@@ -10,7 +10,7 @@
   "scripts": {
     "start": "electron .",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder --win",
+    "dist": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win",
     "hook": "node hooks/cursor-hook.js",
     "simulate:green": "node hooks/cursor-hook.js --event=after --status=green",
     "simulate:yellow": "node hooks/cursor-hook.js --event=before --status=yellow",
@@ -44,17 +44,21 @@
       }
     ],
     "win": {
+      "signAndEditExecutable": false,
       "target": [
         "nsis",
         "portable"
-      ],
-      "artifactName": "${productName}-${version}-${arch}-${target}.${ext}"
+      ]
     },
     "nsis": {
+      "artifactName": "${productName}-${version}-${arch}-nsis.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-${arch}-portable.${ext}"
     }
   },
   "devDependencies": {

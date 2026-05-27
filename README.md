@@ -134,7 +134,18 @@ npm.cmd install
 npm.cmd run dist
 ```
 
+如果你的网络访问 GitHub 需要代理，请先在当前 PowerShell 会话设置代理：
+
+```powershell
+$env:HTTP_PROXY = "http://127.0.0.1:7890"
+$env:HTTPS_PROXY = "http://127.0.0.1:7890"
+$env:NO_PROXY = "localhost,127.0.0.1"
+npm.cmd run dist
+```
+
 打包前请先退出正在运行的开发版灯条，否则 Windows 可能会占用 Electron 文件，导致构建卡在解包阶段。
+
+项目默认关闭代码签名自动探测，并禁用 Windows exe 资源编辑，以避免 Windows 普通权限下解压 `winCodeSign` 时因为符号链接权限导致失败。
 
 打包产物会生成在 `dist` 目录：
 
