@@ -130,6 +130,13 @@ function showContextMenu() {
       type: "radio",
       checked: settings.orientation === "vertical",
       click: () => setOrientation("vertical")
+    },
+    {
+      type: "separator"
+    },
+    {
+      label: "退出",
+      click: () => app.quit()
     }
   ]);
 
@@ -283,7 +290,7 @@ function createWindow() {
     minimizable: false,
     movable: true,
     alwaysOnTop: true,
-    skipTaskbar: true,
+    skipTaskbar: false,
     backgroundColor: "#101214",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
