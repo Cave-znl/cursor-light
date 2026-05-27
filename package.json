@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "electron .",
+    "icon": "node scripts/generate-icon.js",
     "pack": "electron-builder --dir",
     "dist": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win",
     "hook": "node hooks/cursor-hook.js",
@@ -32,6 +33,7 @@
     },
     "files": [
       "src/**/*",
+      "build/**/*",
       "package.json"
     ],
     "extraResources": [
@@ -44,6 +46,7 @@
       }
     ],
     "win": {
+      "icon": "build/icon.ico",
       "signAndEditExecutable": false,
       "target": [
         "nsis",

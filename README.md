@@ -176,6 +176,7 @@ hook 脚本需要系统能执行 `node` 命令。
 
 ```powershell
 npm.cmd start
+npm.cmd run icon
 npm.cmd run dist
 npm.cmd run simulate:yellow
 npm.cmd run simulate:green

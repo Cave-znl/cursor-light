@@ -64,6 +64,10 @@ function getHookScriptPath() {
   return path.join(app.getAppPath(), "hooks", "cursor-hook.js");
 }
 
+function getAppIconPath() {
+  return path.join(app.getAppPath(), "build", "icon.ico");
+}
+
 function getCursorHooksPath() {
   return path.join(app.getPath("home"), ".cursor", "hooks.json");
 }
@@ -439,6 +443,7 @@ function createWindow() {
     alwaysOnTop: true,
     skipTaskbar: false,
     backgroundColor: "#101214",
+    icon: getAppIconPath(),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
