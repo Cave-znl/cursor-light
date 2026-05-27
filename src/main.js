@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, screen } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Menu, screen } = require("electron");
 const fs = require("node:fs");
 const http = require("node:http");
 const path = require("node:path");
@@ -25,6 +25,16 @@ let currentState = {
 };
 
 const history = [];
+const hookEvents = [
+  ["beforeSubmitPrompt", "yellow"],
+  ["beforeShellExecution", "yellow"],
+  ["beforeMCPExecution", "yellow"],
+  ["afterAgentThought", "yellow"],
+  ["afterShellExecution", "yellow"],
+  ["afterFileEdit", "yellow"],
+  ["afterAgentResponse", "green"],
+  ["stop", "green"]
+];
 
 function getSettingsPath() {
   return path.join(app.getPath("userData"), "settings.json");
@@ -44,6 +54,123 @@ function loadSettings() {
 function saveSettings() {
   fs.mkdirSync(app.getPath("userData"), { recursive: true });
   fs.writeFileSync(getSettingsPath(), JSON.stringify(settings, null, 2));
+}
+
+function getHookScriptPath() {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, "hooks", "cursor-hook.js");
+  }
+
+  return path.join(app.getAppPath(), "hooks", "cursor-hook.js");
+}
+
+function getCursorHooksPath() {
+  return path.join(app.getPath("home"), ".cursor", "hooks.json");
+}
+
+function quoteForCommand(value) {
+  return `"${value.replace(/"/g, '\\"')}"`;
+}
+
+function getHookCommand(eventName, status) {
+  return `node ${quoteForCommand(getHookScriptPath())} --event=${eventName} --status=${status}`;
+}
+
+function readCursorHooksConfig() {
+  const hooksPath = getCursorHooksPath();
+
+  if (!fs.existsSync(hooksPath)) {
+    return { version: 1, hooks: {} };
+  }
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(hooksPath, "utf8"));
+    return {
+      ...parsed,
+      version: parsed.version || 1,
+      hooks: parsed.hooks && typeof parsed.hooks === "object" ? parsed.hooks : {}
+    };
+  } catch {
+    const backupPath = `${hooksPath}.invalid-${Date.now()}.bak`;
+    fs.copyFileSync(hooksPath, backupPath);
+    return { version: 1, hooks: {} };
+  }
+}
+
+function hasCursorHooksConfig() {
+  const hooksPath = getCursorHooksPath();
+  if (!fs.existsSync(hooksPath)) return false;
+
+  const normalizedHookScript = getHookScriptPath().toLowerCase();
+  const config = readCursorHooksConfig();
+
+  return hookEvents.every(([eventName, status]) => {
+    const commands = Array.isArray(config.hooks[eventName]) ? config.hooks[eventName] : [];
+    const expected = getHookCommand(eventName, status).toLowerCase();
+
+    return commands.some((entry) => {
+      const command = String(entry && entry.command ? entry.command : "").toLowerCase();
+      return command === expected || command.includes(normalizedHookScript);
+    });
+  });
+}
+
+function configureCursorHooks() {
+  const hooksPath = getCursorHooksPath();
+  const cursorDir = path.dirname(hooksPath);
+  fs.mkdirSync(cursorDir, { recursive: true });
+
+  const existed = fs.existsSync(hooksPath);
+  const config = readCursorHooksConfig();
+  config.version = config.version || 1;
+  config.hooks = config.hooks || {};
+
+  if (existed) {
+    fs.copyFileSync(hooksPath, `${hooksPath}.bak`);
+  }
+
+  for (const [eventName, status] of hookEvents) {
+    const command = getHookCommand(eventName, status);
+    const entries = Array.isArray(config.hooks[eventName]) ? config.hooks[eventName] : [];
+    const alreadyExists = entries.some((entry) => String(entry && entry.command) === command);
+
+    if (!alreadyExists) {
+      entries.push({ command });
+    }
+
+    config.hooks[eventName] = entries;
+  }
+
+  fs.writeFileSync(hooksPath, `${JSON.stringify(config, null, 2)}\n`);
+}
+
+function promptCursorHooksSetup() {
+  if (hasCursorHooksConfig()) return;
+
+  const result = dialog.showMessageBoxSync({
+    type: "question",
+    buttons: ["自动配置", "跳过"],
+    defaultId: 0,
+    cancelId: 1,
+    title: "Cursor Light",
+    message: "是否自动配置 Cursor Hooks？",
+    detail: `配置后 Cursor Light 才能监听 Agent 状态。\n\n将写入：${getCursorHooksPath()}\n\n如果 Cursor 正在运行，配置后请重启 Cursor 或执行 Developer: Reload Window。`
+  });
+
+  if (result !== 0) return;
+
+  try {
+    configureCursorHooks();
+    dialog.showMessageBoxSync({
+      type: "info",
+      buttons: ["知道了"],
+      title: "Cursor Light",
+      message: "Cursor Hooks 已配置",
+      detail: "请重启 Cursor，或在 Cursor 中执行 Developer: Reload Window。"
+    });
+  } catch (error) {
+    dialog.showErrorBox("Cursor Hooks 配置失败", error && error.message ? error.message : String(error));
+  }
 }
 
 function getWidgetSize(display = screen.getPrimaryDisplay()) {
@@ -137,6 +264,26 @@ function showContextMenu() {
     {
       label: "退出",
       click: () => app.quit()
+    },
+    {
+      type: "separator"
+    },
+    {
+      label: "配置 Cursor Hooks",
+      click: () => {
+        try {
+          configureCursorHooks();
+          dialog.showMessageBox({
+            type: "info",
+            buttons: ["知道了"],
+            title: "Cursor Light",
+            message: "Cursor Hooks 已配置",
+            detail: "请重启 Cursor，或在 Cursor 中执行 Developer: Reload Window。"
+          });
+        } catch (error) {
+          dialog.showErrorBox("Cursor Hooks 配置失败", error && error.message ? error.message : String(error));
+        }
+      }
     }
   ]);
 
@@ -321,7 +468,7 @@ ipcMain.handle("state:get", () => ({
   history,
   port: PORT,
   orientation: settings.orientation,
-  hookScript: path.join(app.getAppPath(), "hooks", "cursor-hook.js")
+  hookScript: getHookScriptPath()
 }));
 ipcMain.on("menu:show", showContextMenu);
 ipcMain.on("drag:start", startDrag);
@@ -329,6 +476,7 @@ ipcMain.on("drag:stop", stopDrag);
 
 app.whenReady().then(() => {
   loadSettings();
+  promptCursorHooksSetup();
   createServer();
   createWindow();
 

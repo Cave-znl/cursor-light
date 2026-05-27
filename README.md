@@ -12,6 +12,7 @@ Cursor Light 是一个轻量级 Electron 桌面状态灯工具，用于监听 Cu
 - 支持拖动，靠近屏幕边缘自动吸附
 - 支持右键切换横向和竖向布局
 - 支持右键退出，并显示在 Windows 任务栏中
+- 首次启动可自动配置 Cursor hooks
 - 按屏幕尺寸自适应窗口大小
 - 提供 Windows 安装包和便携版 exe 打包配置
 
@@ -60,13 +61,31 @@ npm.cmd run simulate:red
 
 ## Cursor Hooks 配置
 
-Cursor Light 通过 `hooks/cursor-hook.js` 把 Cursor hook 事件转发给桌面灯条。你可以在 Cursor 的全局配置中添加：
+Cursor Light 通过 `hooks/cursor-hook.js` 把 Cursor hook 事件转发给桌面灯条。
+
+应用启动时会检查：
 
 ```text
 C:\Users\<你的用户名>\.cursor\hooks.json
 ```
 
-示例配置：
+如果没有检测到当前安装目录对应的 hook 配置，会先弹窗询问是否自动配置。选择 `自动配置` 后，应用会合并写入 hooks 配置，并备份旧文件为：
+
+```text
+C:\Users\<你的用户名>\.cursor\hooks.json.bak
+```
+
+配置完成后，需要重启 Cursor，或在 Cursor 中执行：
+
+```text
+Developer: Reload Window
+```
+
+已经在运行中的 Agent 请求不会补发开始事件。如果首次启动时选择跳过，也可以右键灯条，选择 `配置 Cursor Hooks` 重新触发自动配置。
+
+### 手动配置示例
+
+如果你想手动配置，可以参考：
 
 ```json
 {
@@ -106,8 +125,6 @@ C:\Users\<你的用户名>\.cursor\hooks.json
 }
 ```
 
-修改 hooks 配置后，需要重启 Cursor，或执行 `Developer: Reload Window`。已经在运行中的 Agent 请求不会补发开始事件。
-
 ## 打包 exe
 
 项目使用 `electron-builder` 打包 Windows exe：
@@ -130,21 +147,19 @@ npm.cmd run dist
 2. 下载 `Cursor Light-版本号-x64-nsis.exe` 安装包，或下载 `Cursor Light-版本号-x64-portable.exe` 便携版。
 3. 如果使用安装包，双击安装并启动 `Cursor Light`。
 4. 如果使用便携版，直接双击 exe 启动。
-5. 确认灯条显示在屏幕角落后，配置 Cursor hooks。
+5. 首次启动时选择 `自动配置`。
+6. 重启 Cursor，或执行 `Developer: Reload Window`。
+7. 新发起一个 Agent 请求，灯条就会根据 hook 事件切换颜色。
 
-安装包默认会把 hook 脚本复制到应用资源目录。默认安装位置通常类似：
+安装包安装后，hook 脚本会被复制到应用资源目录。默认安装位置通常类似：
 
 ```text
 %LOCALAPPDATA%\Programs\Cursor Light\resources\hooks\cursor-hook.js
 ```
 
-对应 hook 命令示例：
+如果安装时选择了其他目录，自动配置会使用实际运行中的应用资源路径。
 
-```powershell
-node "$env:LOCALAPPDATA\Programs\Cursor Light\resources\hooks\cursor-hook.js" --event=beforeSubmitPrompt --status=yellow
-```
-
-如果安装时选择了其他目录，请把命令中的脚本路径改成实际安装路径。hook 脚本需要系统能执行 `node` 命令。
+hook 脚本需要系统能执行 `node` 命令。
 
 ## 常用脚本
 
