@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": "node D:\\DevWorkspace\\cursor-light\\hooks\\cursor-hook.js --event=beforeSubmitPrompt --status=yellow"
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "node D:\\DevWorkspace\\cursor-light\\hooks\\cursor-hook.js --event=beforeShellExecution --status=yellow"
+      }
+    ],
+    "beforeMCPExecution": [
+      {
+        "command": "node D:\\DevWorkspace\\cursor-light\\hooks\\cursor-hook.js --event=beforeMCPExecution --status=yellow"
+      }
+    ],
+    "afterAgentThought": [
+      {
+        "command": "node D:\\DevWorkspace\\cursor-light\\hooks\\cursor-hook.js --event=afterAgentThought --status=yellow"
+      }
+    ],
+    "afterShellExecution": [
+      {
+        "command": "node D:\\DevWorkspace\\cursor-light\\hooks\\cursor-hook.js --event=afterShellExecution --status=yellow"
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": "node D:\\DevWorkspace\\cursor-light\\hooks\\cursor-hook.js --event=afterFileEdit --status=yellow"
+      }
+    ],
+    "afterAgentResponse": [
+      {
+        "command": "node D:\\DevWorkspace\\cursor-light\\hooks\\cursor-hook.js --event=afterAgentResponse --status=green"
+      }
+    ],
+    "stop": [
+      {
+        "command": "node D:\\DevWorkspace\\cursor-light\\hooks\\cursor-hook.js --event=stop --status=green"
+      }
+    ]
+  }
+}
