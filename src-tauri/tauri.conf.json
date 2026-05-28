@@ -20,7 +20,7 @@
         "alwaysOnTop": true,
         "skipTaskbar": false,
         "visible": true,
-        "transparent": false
+        "transparent": true
       }
     ],
     "security": {
