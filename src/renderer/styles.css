@@ -88,9 +88,10 @@ button {
   position: absolute;
   z-index: 4;
   display: grid;
-  width: min(104px, calc(100vw - 8px));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(124px, calc(100vw - 8px));
   min-width: 0;
-  padding: 5px;
+  padding: 4px;
   border: 1px solid var(--case-edge);
   background: rgba(16, 18, 20, 0.98);
   box-shadow: 0 12px 26px rgba(0, 0, 0, 0.36);
@@ -131,6 +132,11 @@ button {
   grid-template-columns: 1fr;
   grid-template-rows: repeat(3, minmax(0, 1fr));
   gap: max(7px, 3.8vh);
+}
+
+:root[data-orientation="vertical"] .context-menu {
+  grid-template-columns: 1fr;
+  width: min(84px, calc(100vw - 8px));
 }
 
 :root[data-orientation="vertical"] .lamp {
@@ -195,6 +201,11 @@ button {
     grid-template-columns: 1fr;
     grid-template-rows: repeat(3, minmax(0, 1fr));
     gap: max(7px, 3.8vh);
+  }
+
+  .context-menu {
+    grid-template-columns: 1fr;
+    width: min(84px, calc(100vw - 8px));
   }
 
   .lamp {
