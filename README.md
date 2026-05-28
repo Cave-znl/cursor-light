@@ -1,6 +1,6 @@
 # Cursor Light
 
-Cursor Light 是一个轻量级 Electron 桌面状态灯工具，用于监听 Cursor hooks，并通过红、黄、绿三色灯实时显示 Agent 当前状态。它适合放在屏幕角落，帮助你不用盯着 Cursor 面板也能知道 Agent 正在执行、已经完成，还是遇到了错误。
+Cursor Light 是一个轻量级 Tauri 桌面状态灯工具，用于监听 Cursor hooks，并通过红、黄、绿三色灯实时显示 Agent 当前状态。它适合放在屏幕角落，帮助你不用盯着 Cursor 面板也能知道 Agent 正在执行、已经完成，还是遇到了错误。
 
 ![Cursor Light screenshot](docs/screenshot.svg)
 
@@ -14,7 +14,8 @@ Cursor Light 是一个轻量级 Electron 桌面状态灯工具，用于监听 Cu
 - 支持右键退出，并显示在 Windows 任务栏中
 - 首次启动可自动配置 Cursor hooks
 - 按屏幕尺寸自适应窗口大小
-- 提供 Windows 安装包和便携版 exe 打包配置
+- Tauri 原生壳，便携版 exe 体积远小于 Electron 版本
+- hook 命令直接调用 exe，不再要求用户额外安装 Node.js
 
 ## 状态含义
 
@@ -31,7 +32,9 @@ Cursor Light 是一个轻量级 Electron 桌面状态灯工具，用于监听 Cu
 - Windows
 - Node.js 22+
 - npm
-- Cursor
+- Rust stable
+- Visual Studio 2022 Build Tools，包含 `Desktop development with C++`
+- WebView2 Runtime，Windows 11 通常自带
 
 ### 安装依赖
 
@@ -39,19 +42,20 @@ Cursor Light 是一个轻量级 Electron 桌面状态灯工具，用于监听 Cu
 npm.cmd install
 ```
 
-### 启动应用
+如果 Rust 拉取 crates.io 较慢，可以使用项目内置的 `.cargo/config.toml`，它已经配置了 USTC 镜像。
+
+### 启动开发版
+
+普通 PowerShell 可能找不到 MSVC linker。建议通过 VS 开发环境启动：
 
 ```powershell
-npm.cmd start
-```
-
-应用会启动本地 hook 接收器：
-
-```text
-http://127.0.0.1:18765/hook
+$vsPath = & 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe' -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+cmd /c "call `"$vsPath\Common7\Tools\VsDevCmd.bat`" -arch=x64 -host_arch=x64 && cd /d D:\DevWorkspace\cursor-light && npm.cmd start"
 ```
 
 ### 模拟灯色
+
+应用启动后，在另一个终端运行：
 
 ```powershell
 npm.cmd run simulate:yellow
@@ -61,7 +65,11 @@ npm.cmd run simulate:red
 
 ## Cursor Hooks 配置
 
-Cursor Light 通过 `hooks/cursor-hook.js` 把 Cursor hook 事件转发给桌面灯条。
+Cursor Light 的 Tauri 版本不再依赖 `node hooks/cursor-hook.js`。自动配置会直接把当前 exe 写入 hooks 命令：
+
+```text
+"C:\Path\To\Cursor Light.exe" --hook --event=beforeSubmitPrompt --status=yellow
+```
 
 应用启动时会检查：
 
@@ -69,7 +77,7 @@ Cursor Light 通过 `hooks/cursor-hook.js` 把 Cursor hook 事件转发给桌面
 C:\Users\<你的用户名>\.cursor\hooks.json
 ```
 
-如果没有检测到当前安装目录对应的 hook 配置，会先弹窗询问是否自动配置。选择 `自动配置` 后，应用会合并写入 hooks 配置，并备份旧文件为：
+如果没有检测到当前 exe 对应的 hook 配置，会先弹窗询问是否自动配置。选择 `自动配置` 后，应用会合并写入 hooks 配置，并备份旧文件为：
 
 ```text
 C:\Users\<你的用户名>\.cursor\hooks.json.bak
@@ -83,55 +91,24 @@ Developer: Reload Window
 
 已经在运行中的 Agent 请求不会补发开始事件。如果首次启动时选择跳过，也可以右键灯条，选择 `配置 Cursor Hooks` 重新触发自动配置。
 
-### 手动配置示例
-
-如果你想手动配置，可以参考：
-
-```json
-{
-  "version": 1,
-  "hooks": {
-    "beforeSubmitPrompt": [
-      {
-        "command": "node D:\\DevWorkspace\\cursor-light\\hooks\\cursor-hook.js --event=beforeSubmitPrompt --status=yellow"
-      }
-    ],
-    "afterAgentThought": [
-      {
-        "command": "node D:\\DevWorkspace\\cursor-light\\hooks\\cursor-hook.js --event=afterAgentThought --status=yellow"
-      }
-    ],
-    "afterShellExecution": [
-      {
-        "command": "node D:\\DevWorkspace\\cursor-light\\hooks\\cursor-hook.js --event=afterShellExecution --status=yellow"
-      }
-    ],
-    "afterFileEdit": [
-      {
-        "command": "node D:\\DevWorkspace\\cursor-light\\hooks\\cursor-hook.js --event=afterFileEdit --status=yellow"
-      }
-    ],
-    "afterAgentResponse": [
-      {
-        "command": "node D:\\DevWorkspace\\cursor-light\\hooks\\cursor-hook.js --event=afterAgentResponse --status=green"
-      }
-    ],
-    "stop": [
-      {
-        "command": "node D:\\DevWorkspace\\cursor-light\\hooks\\cursor-hook.js --event=stop --status=green"
-      }
-    ]
-  }
-}
-```
-
 ## 打包 exe
 
-项目使用 `electron-builder` 打包 Windows exe：
+默认打包为便携版 exe，不依赖 NSIS 下载：
 
 ```powershell
-npm.cmd install
 npm.cmd run dist
+```
+
+产物会生成在：
+
+```text
+dist\Cursor Light-0.1.0-x64-portable.exe
+```
+
+如果需要安装包，可以在网络能够访问 GitHub release 资源时运行：
+
+```powershell
+npm.cmd run dist:installer
 ```
 
 如果你的网络访问 GitHub 需要代理，请先在当前 PowerShell 会话设置代理：
@@ -140,44 +117,23 @@ npm.cmd run dist
 $env:HTTP_PROXY = "http://127.0.0.1:7890"
 $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 $env:NO_PROXY = "localhost,127.0.0.1"
-npm.cmd run dist
 ```
-
-打包前请先退出正在运行的开发版灯条，否则 Windows 可能会占用 Electron 文件，导致构建卡在解包阶段。
-
-项目默认关闭代码签名自动探测，并禁用 Windows exe 资源编辑，以避免 Windows 普通权限下解压 `winCodeSign` 时因为符号链接权限导致失败。
-
-打包产物会生成在 `dist` 目录：
-
-- `Cursor Light-0.1.0-x64-nsis.exe`：安装包
-- `Cursor Light-0.1.0-x64-portable.exe`：便携版
 
 ## Release 版安装说明
 
 1. 打开 GitHub 仓库的 `Releases` 页面。
-2. 下载 `Cursor Light-版本号-x64-nsis.exe` 安装包，或下载 `Cursor Light-版本号-x64-portable.exe` 便携版。
-3. 如果使用安装包，双击安装并启动 `Cursor Light`。
-4. 如果使用便携版，直接双击 exe 启动。
-5. 首次启动时选择 `自动配置`。
-6. 重启 Cursor，或执行 `Developer: Reload Window`。
-7. 新发起一个 Agent 请求，灯条就会根据 hook 事件切换颜色。
-
-安装包安装后，hook 脚本会被复制到应用资源目录。默认安装位置通常类似：
-
-```text
-%LOCALAPPDATA%\Programs\Cursor Light\resources\hooks\cursor-hook.js
-```
-
-如果安装时选择了其他目录，自动配置会使用实际运行中的应用资源路径。
-
-hook 脚本需要系统能执行 `node` 命令。
+2. 下载 `Cursor Light-版本号-x64-portable.exe`。
+3. 双击 exe 启动。
+4. 首次启动时选择 `自动配置`。
+5. 重启 Cursor，或执行 `Developer: Reload Window`。
+6. 新发起一个 Agent 请求，灯条就会根据 hook 事件切换颜色。
 
 ## 常用脚本
 
 ```powershell
 npm.cmd start
-npm.cmd run icon
 npm.cmd run dist
+npm.cmd run dist:installer
 npm.cmd run simulate:yellow
 npm.cmd run simulate:green
 npm.cmd run simulate:red

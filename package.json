@@ -2,70 +2,32 @@
   "name": "cursor-light",
   "version": "0.1.0",
   "description": "Desktop traffic light panel for Cursor hook events.",
-  "main": "src/main.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/Cave-znl/cursor-light.git"
   },
   "scripts": {
-    "start": "electron .",
+    "start": "tauri dev",
+    "dev": "tauri dev",
     "icon": "node scripts/generate-icon.js",
-    "pack": "electron-builder --dir",
-    "dist": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win",
-    "hook": "node hooks/cursor-hook.js",
-    "simulate:green": "node hooks/cursor-hook.js --event=after --status=green",
-    "simulate:yellow": "node hooks/cursor-hook.js --event=before --status=yellow",
-    "simulate:red": "node hooks/cursor-hook.js --event=error --status=red"
+    "dist": "tauri build --no-bundle && node scripts/copy-tauri-release.js",
+    "dist:installer": "tauri build --bundles nsis",
+    "simulate:green": "powershell -NoProfile -Command \"Invoke-RestMethod -Uri http://127.0.0.1:18765/hook -Method Post -ContentType application/json -Body '{\\\"event\\\":\\\"after\\\",\\\"status\\\":\\\"green\\\"}'\"",
+    "simulate:yellow": "powershell -NoProfile -Command \"Invoke-RestMethod -Uri http://127.0.0.1:18765/hook -Method Post -ContentType application/json -Body '{\\\"event\\\":\\\"before\\\",\\\"status\\\":\\\"yellow\\\"}'\"",
+    "simulate:red": "powershell -NoProfile -Command \"Invoke-RestMethod -Uri http://127.0.0.1:18765/hook -Method Post -ContentType application/json -Body '{\\\"event\\\":\\\"error\\\",\\\"status\\\":\\\"red\\\"}'\""
   },
   "keywords": [
     "cursor",
     "hooks",
-    "electron",
+    "tauri",
     "traffic-light"
   ],
   "author": "",
   "license": "MIT",
-  "build": {
-    "appId": "local.cursor-light",
-    "productName": "Cursor Light",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "src/**/*",
-      "build/**/*",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "hooks",
-        "to": "hooks",
-        "filter": [
-          "cursor-hook.js"
-        ]
-      }
-    ],
-    "win": {
-      "icon": "build/icon.ico",
-      "signAndEditExecutable": false,
-      "target": [
-        "nsis",
-        "portable"
-      ]
-    },
-    "nsis": {
-      "artifactName": "${productName}-${version}-${arch}-nsis.${ext}",
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
-    },
-    "portable": {
-      "artifactName": "${productName}-${version}-${arch}-portable.${ext}"
-    }
-  },
   "devDependencies": {
-    "electron": "^39.8.5",
-    "electron-builder": "^26.8.1"
+    "@tauri-apps/cli": "^2.11.2"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.0"
   }
 }
