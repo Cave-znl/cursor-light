@@ -71,36 +71,15 @@ button {
   gap: 6px;
 }
 
-.setup-panel button,
-.context-menu button {
+.setup-panel button {
   min-height: 26px;
   padding: 5px 9px;
   background: rgba(255, 255, 255, 0.1);
   cursor: pointer;
 }
 
-.setup-panel button:hover,
-.context-menu button:hover {
+.setup-panel button:hover {
   background: rgba(53, 220, 116, 0.28);
-}
-
-.context-menu {
-  position: absolute;
-  z-index: 4;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  width: min(124px, calc(100vw - 8px));
-  min-width: 0;
-  padding: 4px;
-  border: 1px solid var(--case-edge);
-  background: rgba(16, 18, 20, 0.98);
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.36);
-}
-
-.context-menu button {
-  width: 100%;
-  text-align: left;
-  white-space: nowrap;
 }
 
 .hidden {
@@ -132,11 +111,6 @@ button {
   grid-template-columns: 1fr;
   grid-template-rows: repeat(3, minmax(0, 1fr));
   gap: max(7px, 3.8vh);
-}
-
-:root[data-orientation="vertical"] .context-menu {
-  grid-template-columns: 1fr;
-  width: min(84px, calc(100vw - 8px));
 }
 
 :root[data-orientation="vertical"] .lamp {
@@ -201,11 +175,6 @@ button {
     grid-template-columns: 1fr;
     grid-template-rows: repeat(3, minmax(0, 1fr));
     gap: max(7px, 3.8vh);
-  }
-
-  .context-menu {
-    grid-template-columns: 1fr;
-    width: min(84px, calc(100vw - 8px));
   }
 
   .lamp {

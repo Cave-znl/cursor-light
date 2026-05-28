@@ -1,16 +1,21 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
-    env,
-    fs,
+    env, fs,
     io::{Read, Write},
     net::{TcpListener, TcpStream},
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+    },
     thread,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, Position, Size, WebviewWindow};
+use tauri::{
+    menu::MenuBuilder, Emitter, Manager, PhysicalPosition, PhysicalSize, Position, Size,
+    WebviewWindow, WindowEvent,
+};
 
 const HOST: &str = "127.0.0.1";
 const PORT: u16 = 18765;
@@ -164,7 +169,11 @@ fn summarize(payload: &Value) -> String {
                 .and_then(Value::as_str)
                 .map(|command| format!("Command: {command}"))
         })
-        .or_else(|| payload.get("prompt").map(|_| "Prompt submitted".to_string()))
+        .or_else(|| {
+            payload
+                .get("prompt")
+                .map(|_| "Prompt submitted".to_string())
+        })
         .or_else(|| {
             payload
                 .get("file")
@@ -236,8 +245,11 @@ fn save_settings(settings: &Settings) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
     }
-    fs::write(path, serde_json::to_string_pretty(settings).map_err(|error| error.to_string())?)
-        .map_err(|error| error.to_string())
+    fs::write(
+        path,
+        serde_json::to_string_pretty(settings).map_err(|error| error.to_string())?,
+    )
+    .map_err(|error| error.to_string())
 }
 
 fn hook_events() -> Vec<(&'static str, &'static str)> {
@@ -393,7 +405,10 @@ fn widget_size(window: &WebviewWindow, orientation: &Orientation) -> Result<(u32
     let height = size.height;
     Ok(match orientation {
         Orientation::Horizontal => ((width / 10).max(120), (height / 15).max(56)),
-        Orientation::Vertical => ((width / 24).max(44), ((height as f64 / 5.5) as u32).max(180)),
+        Orientation::Vertical => (
+            (width / 24).max(44),
+            ((height as f64 / 5.5) as u32).max(180),
+        ),
     })
 }
 
@@ -447,6 +462,43 @@ fn snap_window_inner(window: &WebviewWindow, state: &SharedState) -> Result<(), 
     Ok(())
 }
 
+fn apply_orientation(
+    window: &WebviewWindow,
+    state: &SharedState,
+    orientation: String,
+) -> Result<(), String> {
+    let next = match orientation.as_str() {
+        "horizontal" => Orientation::Horizontal,
+        "vertical" => Orientation::Vertical,
+        _ => return Err("Invalid orientation".to_string()),
+    };
+
+    {
+        let mut data = state.lock().map_err(|_| "state poisoned".to_string())?;
+        data.settings.orientation = next;
+        save_settings(&data.settings)?;
+        window
+            .emit("orientation-changed", data.settings.orientation.as_str())
+            .map_err(|error| error.to_string())?;
+    }
+
+    snap_window_inner(window, state)
+}
+
+fn schedule_snap(app: tauri::AppHandle, state: SharedState, move_counter: Arc<AtomicU64>) {
+    let current = move_counter.fetch_add(1, Ordering::Relaxed) + 1;
+    thread::spawn(move || {
+        thread::sleep(Duration::from_millis(420));
+        if move_counter.load(Ordering::Relaxed) != current {
+            return;
+        }
+
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = snap_window_inner(&window, &state);
+        }
+    });
+}
+
 #[tauri::command]
 fn get_state(state: tauri::State<'_, SharedState>) -> Result<StatePayload, String> {
     let data = state.lock().map_err(|_| "state poisoned".to_string())?;
@@ -464,22 +516,7 @@ fn set_orientation(
     window: WebviewWindow,
     state: tauri::State<'_, SharedState>,
 ) -> Result<(), String> {
-    let next = match orientation.as_str() {
-        "horizontal" => Orientation::Horizontal,
-        "vertical" => Orientation::Vertical,
-        _ => return Err("Invalid orientation".to_string()),
-    };
-
-    {
-        let mut data = state.lock().map_err(|_| "state poisoned".to_string())?;
-        data.settings.orientation = next;
-        save_settings(&data.settings)?;
-        window
-            .emit("orientation-changed", data.settings.orientation.as_str())
-            .map_err(|error| error.to_string())?;
-    }
-
-    snap_window_inner(&window, &state)
+    apply_orientation(&window, &state, orientation)
 }
 
 #[tauri::command]
@@ -490,6 +527,34 @@ fn snap_window(window: WebviewWindow, state: tauri::State<'_, SharedState>) -> R
 #[tauri::command]
 fn configure_cursor_hooks() -> Result<(), String> {
     configure_cursor_hooks_inner()
+}
+
+#[tauri::command]
+fn show_context_menu(
+    app: tauri::AppHandle,
+    window: WebviewWindow,
+    x: f64,
+    y: f64,
+) -> Result<(), String> {
+    let menu = MenuBuilder::new(&app)
+        .text("horizontal", "横向")
+        .text("vertical", "竖向")
+        .separator()
+        .text("configure", "配置 Cursor Hooks")
+        .separator()
+        .text("quit", "退出")
+        .build()
+        .map_err(|error| error.to_string())?;
+
+    window
+        .popup_menu_at(
+            &menu,
+            Position::Physical(PhysicalPosition {
+                x: x.round() as i32,
+                y: y.round() as i32,
+            }),
+        )
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -681,6 +746,10 @@ fn main() {
 
     let state = build_state();
     let managed_state = state.clone();
+    let menu_state = state.clone();
+    let snap_state = state.clone();
+    let move_counter = Arc::new(AtomicU64::new(0));
+    let snap_counter = move_counter.clone();
 
     tauri::Builder::default()
         .manage(managed_state)
@@ -689,8 +758,40 @@ fn main() {
             set_orientation,
             snap_window,
             configure_cursor_hooks,
+            show_context_menu,
             quit_app
         ])
+        .on_menu_event(move |app, event| {
+            let id = event.id().as_ref();
+            if id == "quit" {
+                app.exit(0);
+                return;
+            }
+
+            if id == "configure" {
+                let _ = configure_cursor_hooks_inner();
+                return;
+            }
+
+            if id == "horizontal" || id == "vertical" {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = apply_orientation(&window, &menu_state, id.to_string());
+                }
+            }
+        })
+        .on_window_event(move |window, event| {
+            if window.label() != "main" {
+                return;
+            }
+
+            if matches!(event, WindowEvent::Moved(_)) {
+                schedule_snap(
+                    window.app_handle().clone(),
+                    snap_state.clone(),
+                    snap_counter.clone(),
+                );
+            }
+        })
         .setup(move |app| {
             let window = app
                 .get_webview_window("main")
